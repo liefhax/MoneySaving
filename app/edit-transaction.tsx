@@ -1,5 +1,5 @@
-// app/modal.tsx
-import React, { useState } from 'react';
+// app/edit-transaction.tsx
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,87 +7,127 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  Platform // Untuk cek OS (Android/iOS)
 } from 'react-native';
-import { addTransaction } from '../services/database';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getTransactionById, updateTransaction } from '../services/database';
+// --- IMPORT DATE PICKER ---
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
-// --- DATA DUMMY BARU ---
+// Data Dummy (harus sama dengan modal.tsx)
 const SOURCE_ACCOUNTS = ['Bank', 'Cash', 'E-Wallet', 'Lainnya'];
 const INCOME_PURPOSES = ['Gaji', 'Bonus', 'Freelance', 'Lainnya'];
 const EXPENSE_PURPOSES = ['Makanan', 'Transportasi', 'Tagihan', 'Hiburan', 'Lainnya'];
-// ----------------------------
 
-export default function ModalAddPage() {
+export default function EditTransactionPage() {
   const router = useRouter();
-  
+  const { id } = useLocalSearchParams();
+  const transactionId = parseInt(id as string);
+
   // State Utama
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('income');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // State Baru
-  const [source, setSource] = useState(''); // 'Bank', 'Cash', dll
-  const [customSource, setCustomSource] = useState(''); // Input 'Lainnya' untuk source
-  const [purpose, setPurpose] = useState(''); // 'Gaji', 'Makanan', dll
-  const [customPurpose, setCustomPurpose] = useState(''); // Input 'Lainnya' untuk purpose
+  // State Kategori
+  const [source, setSource] = useState('');
+  const [customSource, setCustomSource] = useState('');
+  const [purpose, setPurpose] = useState('');
+  const [customPurpose, setCustomPurpose] = useState('');
 
-  const handleSave = async () => {
-    // Validasi Dasar
+  // --- STATE BARU UNTUK TANGGAL ---
+  const [date, setDate] = useState(new Date()); // Simpan sebagai objek Date
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  // ---------------------------------
+
+  const setCategoryState = (
+    data: string, dummyArray: string[], setDummy: (val: string) => void, setCustom: (val: string) => void
+  ) => {
+    if (dummyArray.includes(data)) {
+      setDummy(data);
+    } else {
+      setDummy('Lainnya');
+      setCustom(data);
+    }
+  };
+
+  // Load data
+  useEffect(() => {
+    if (!transactionId) return;
+    const loadData = async () => {
+      try {
+        const data = await getTransactionById(transactionId);
+        if (data) {
+          setTitle(data.title);
+          setAmount(data.amount.toString());
+          setType(data.type);
+          setDate(new Date(data.date)); // <-- Ubah string jadi objek Date
+          
+          setCategoryState(data.source, SOURCE_ACCOUNTS, setSource, setCustomSource);
+          if (data.type === 'income') {
+            setCategoryState(data.purpose, INCOME_PURPOSES, setPurpose, setCustomPurpose);
+          } else {
+            setCategoryState(data.purpose, EXPENSE_PURPOSES, setPurpose, setCustomPurpose);
+          }
+        } else {
+          Alert.alert("Error", "Data tidak ditemukan.");
+          router.back();
+        }
+      } catch (error) {
+        Alert.alert("Error", "Gagal memuat data.");
+        router.back();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, [transactionId]);
+
+  // Simpan Perubahan
+  const handleUpdate = async () => {
     const numericAmount = parseFloat(amount);
     if (!title || !amount || isNaN(numericAmount) || numericAmount <= 0) {
-      alert('Harap isi judul dan jumlah dengan benar.');
+      alert('Harap isi semua field dengan benar.');
       return;
     }
 
-    // --- LOGIKA BARU UNTUK 'SOURCE' (Saldo) ---
-    let finalSource = '';
-    if (source === 'Lainnya') {
-      if (!customSource) {
-        alert('Harap isi "Sumber Saldo Lainnya"');
-        return;
-      }
-      finalSource = customSource;
-    } else if (!source) {
-      alert(type === 'income' ? 'Harap pilih "Simpan ke Saldo"' : 'Harap pilih "Ambil dari Saldo"');
+    let finalSource = (source === 'Lainnya') ? customSource : source;
+    let finalPurpose = (purpose === 'Lainnya') ? customPurpose : purpose;
+
+    if (!finalSource || !finalPurpose) {
+      alert('Harap lengkapi kategori sumber dan tujuan.');
       return;
-    } else {
-      finalSource = source;
     }
     
-    // --- LOGIKA BARU UNTUK 'PURPOSE' (Kategori) ---
-    let finalPurpose = '';
-    if (purpose === 'Lainnya') {
-      if (!customPurpose) {
-        alert('Harap isi "Kategori Lainnya"');
-        return;
-      }
-      finalPurpose = customPurpose;
-    } else if (!purpose) {
-      alert(type === 'income' ? 'Harap pilih "Sumber Pemasukan"' : 'Harap pilih "Kategori Pengeluaran"');
-      return;
-    } else {
-      finalPurpose = purpose;
-    }
-    // ----------------------------------
-
-    const date = new Date().toISOString().split('T')[0];
+    // Format tanggal baru ke string ISO (YYYY-MM-DD)
+    const newISODate = date.toISOString().split('T')[0];
 
     try {
-      // Kirim parameter baru ke database
-      await addTransaction(title, numericAmount, type, date, finalSource, finalPurpose);
-      router.replace('/(tabs)');
+      await updateTransaction(
+        transactionId, title, numericAmount, type,
+        newISODate, // <-- Kirim tanggal yang sudah diupdate
+        finalSource, finalPurpose
+      );
+      
+      router.back(); // Kembali ke halaman Detail
     } catch (error) {
-      console.error("Gagal simpan dari modal:", error);
-      Alert.alert('Database Error', 'Gagal menyimpan transaksi: ' + (error as Error).message);
+      console.error("Gagal update:", error);
+      Alert.alert("Error", "Gagal menyimpan perubahan.");
     }
   };
 
-  const handleClose = () => {
-    router.replace('/(tabs)');
+  // Fungsi untuk handle Date Picker
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    const currentDate = selectedDate || date;
+    setShowDatePicker(Platform.OS === 'ios'); // Tutup otomatis di Android
+    setDate(currentDate);
   };
   
-  // Helper untuk render tombol (dipakai 2x)
+  // Helper render tombol
   const renderButtons = (data: string[], state: string, setState: (val: string) => void) => {
     return data.map((item) => (
       <TouchableOpacity
@@ -101,22 +141,48 @@ export default function ModalAddPage() {
       </TouchableOpacity>
     ));
   };
-
-  // Reset state saat ganti Tipe
+  
   const handleTypeChange = (newType: 'income' | 'expense') => {
     setType(newType);
-    setSource('');
-    setCustomSource('');
     setPurpose('');
     setCustomPurpose('');
   };
 
-  return (
-    <View style={styles.overlay}>
-      <ScrollView style={styles.modalBox} contentContainerStyle={{ padding: 20 }}>
-        <Text style={styles.title}>Tambah Transaksi</Text>
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6A5ACD" />
+      </SafeAreaView>
+    );
+  }
 
-        {/* Tipe (Pemasukan/Pengeluaran) */}
+  return (
+    <SafeAreaView style={styles.overlay}>
+      <ScrollView style={styles.modalBox} contentContainerStyle={{ padding: 20 }}>
+        
+        {/* --- TOMBOL DATE PICKER --- */}
+        <View style={styles.categorySection}>
+          <Text style={styles.label}>Tanggal Transaksi</Text>
+          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.input}>
+            <Text style={{fontSize: 16}}>
+              {date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Munculkan Date Picker jika 'showDatePicker' true */}
+        {showDatePicker && (
+          <DateTimePicker
+            testID="dateTimePicker"
+            value={date}
+            mode="date"
+            is24Hour={true}
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
+        {/* ------------------------- */}
+
         <View style={styles.typeContainer}>
           <TouchableOpacity 
             style={[styles.typeButton, type === 'income' && styles.activeIncome]}
@@ -133,7 +199,7 @@ export default function ModalAddPage() {
         </View>
 
         <TextInput
-          placeholder="Judul (Cth: Gaji bulanan, Makan siang)"
+          placeholder="Judul"
           style={styles.input}
           value={title}
           onChangeText={setTitle}
@@ -146,9 +212,7 @@ export default function ModalAddPage() {
           onChangeText={setAmount}
         />
 
-        {/* --- UI KONDISIONAL --- */}
-        
-        {/* ---- BAGIAN PEMASUKAN ---- */}
+        {/* UI KONDISIONAL (Sama kayak modal) */}
         {type === 'income' && (
           <>
             <View style={styles.categorySection}>
@@ -165,7 +229,6 @@ export default function ModalAddPage() {
                 />
               )}
             </View>
-
             <View style={styles.categorySection}>
               <Text style={styles.label}>Simpan ke Saldo (Ke mana)</Text>
               <View style={styles.categoryRow}>
@@ -173,7 +236,7 @@ export default function ModalAddPage() {
               </View>
               {source === 'Lainnya' && (
                 <TextInput
-                  placeholder="Tulis Saldo Lainnya (Cth: Rekening B)..."
+                  placeholder="Tulis Saldo Lainnya..."
                   style={styles.input}
                   value={customSource}
                   onChangeText={setCustomSource}
@@ -182,8 +245,6 @@ export default function ModalAddPage() {
             </View>
           </>
         )}
-
-        {/* ---- BAGIAN PENGELUARAN ---- */}
         {type === 'expense' && (
           <>
             <View style={styles.categorySection}>
@@ -193,14 +254,13 @@ export default function ModalAddPage() {
               </View>
               {source === 'Lainnya' && (
                 <TextInput
-                  placeholder="Tulis Saldo Lainnya (Cth: Rekening B)..."
+                  placeholder="Tulis Saldo Lainnya..."
                   style={styles.input}
                   value={customSource}
                   onChangeText={setCustomSource}
                 />
               )}
             </View>
-            
             <View style={styles.categorySection}>
               <Text style={styles.label}>Kategori Pengeluaran (Untuk apa)</Text>
               <View style={styles.categoryRow}>
@@ -217,24 +277,23 @@ export default function ModalAddPage() {
             </View>
           </>
         )}
-
-        {/* Tombol Simpan & Batal */}
+        
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={[styles.button, styles.buttonBatal]}
-            onPress={handleClose}
+            onPress={() => router.back()}
           >
             <Text style={styles.buttonBatalText}>Batal</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.buttonSimpan]}
-            onPress={handleSave}
+            onPress={handleUpdate}
           >
-            <Text style={styles.buttonSimpanText}>Simpan</Text>
+            <Text style={styles.buttonSimpanText}>Simpan Perubahan</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -242,21 +301,18 @@ export default function ModalAddPage() {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#fff',
   },
   modalBox: {
     backgroundColor: 'white',
-    width: '90%',
-    maxHeight: '80%',
-    borderRadius: 10,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 20,
-    textAlign: 'center',
+    width: '100%',
+    height: '100%',
   },
   input: {
     borderWidth: 1,
@@ -265,6 +321,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 15,
     fontSize: 16,
+    justifyContent: 'center', // Biar teks di tombol tanggal pas di tengah
+    minHeight: 45, // Samain tinggi
   },
   typeContainer: {
     flexDirection: 'row',

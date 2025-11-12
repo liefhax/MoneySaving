@@ -1,98 +1,178 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+// app/(tabs)/index.tsx
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
+import Constants from 'expo-constants'; 
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import TransactionItem from '../../components/TransactionItem';
+import { getTransactions, getTotals } from '../../services/database';
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+const HomeScreen = () => {
+  const router = useRouter();
+  const [totals, setTotals] = useState({ income: 0, expense: 0, balance: 0 });
+  const [transactions, setTransactions] = useState<any[]>([]);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadData = useCallback(async () => {
+    try {
+      const [totalsData, transactionsData] = await Promise.all([
+        getTotals(),
+        getTransactions()
+      ]);
+      setTotals(totalsData);
+      setTransactions(transactionsData);
+    } catch (error) {
+      console.error("Gagal memuat data:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+      return () => {};
+    }, [loadData])
   );
-}
+  
+  const formatIDR = (value: number) => {
+    return value.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+  };
 
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* === HEADER === */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Ionicons name="grid" size={26} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Home</Text>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Ionicons name="notifications" size={26} color="#333" />
+          </TouchableOpacity>
+        </View>
+
+        {/* === KARTU BALANCE === */}
+        <LinearGradient
+          colors={['#8E2DE2', '#4A00E0']}
+          style={styles.balanceCard}
+        >
+          <Text style={styles.balanceLabel}>Total Balance</Text>
+          <Text style={styles.balanceAmount}>IDR {formatIDR(totals.balance)}</Text>
+          <View style={styles.incomeExpenseContainer}>
+            <View style={styles.incomeExpenseBox}>
+              <Ionicons name="arrow-down" size={20} color="#28B463" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.ieLabel}>Income</Text>
+                <Text style={styles.ieAmount}>IDR {formatIDR(totals.income)}</Text>
+              </View>
+            </View>
+            <View style={styles.incomeExpenseBox}>
+              <Ionicons name="arrow-up" size={20} color="#E74C3C" />
+              <View style={{ marginLeft: 8 }}>
+                <Text style={styles.ieLabel}>Expenses</Text>
+                <Text style={styles.ieAmount}>IDR {formatIDR(totals.expense)}</Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* === TRANSACTIONS === */}
+        <View style={styles.transactionsHeader}>
+          <Text style={styles.transactionsTitle}>Transactions</Text>
+          <TouchableOpacity onPress={() => router.push('/all-transactions')}>
+            <Text style={styles.seeAll}>See All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* List Transaksi */}
+        <FlatList
+          data={transactions.slice(0, 5)}
+          keyExtractor={(item) => item.id.toString()}
+          // --- UBAH RENDER ITEM ---
+          renderItem={({ item }) => (
+            <TransactionItem
+              title={item.title}
+              purpose={item.purpose} // <-- Kirim 'purpose'
+              date={new Date(item.date).toLocaleDateString()}
+              amount={item.amount}
+              type={item.type}
+            />
+          )}
+          // ------------------------
+          style={styles.list}
+          ListEmptyComponent={<Text style={styles.emptyText}>Belum ada transaksi</Text>}
+        />
+      </View>
+    </SafeAreaView>
+  );
+};
+
+// --- STYLES (Tetap sama) ---
 const styles = StyleSheet.create({
-  titleContainer: {
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: '#fff' 
+  },
+  container: { 
+    flex: 1, 
+    paddingHorizontal: 20, 
+    paddingTop: Constants.statusBarHeight + 5
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  headerIcon: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  balanceCard: {
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 20,
+  },
+  balanceLabel: { fontSize: 16, color: 'rgba(255,255,255,0.7)' },
+  balanceAmount: {
+    fontSize: 34,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginVertical: 5,
+  },
+  incomeExpenseContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 15,
+  },
+  incomeExpenseBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  ieLabel: { fontSize: 14, color: 'rgba(255,255,255,0.7)' },
+  ieAmount: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
+  transactionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  transactionsTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
+  seeAll: { fontSize: 14, color: '#6A5ACD', fontWeight: 'bold' },
+  list: {
+    flex: 1,
+    paddingBottom: 80
   },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#888',
+    fontSize: 16,
+  }
 });
+
+export default HomeScreen;

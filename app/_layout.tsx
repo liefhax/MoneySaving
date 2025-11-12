@@ -1,24 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+// app/_layout.tsx
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack>
+      <Stack.Screen 
+        name="index" 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="(tabs)" 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="modal" 
+        options={{ 
+          presentation: 'transparentModal',
+          headerShown: false,
+          animation: 'fade',
+        }} 
+      />
+      <Stack.Screen
+        name="all-transactions"
+        options={{
+          presentation: 'modal',
+          headerShown: true,
+          title: 'Semua Transaksi',
+        }}
+      />
+      <Stack.Screen
+        name="edit-transaction"
+        options={{
+          presentation: 'modal',
+          headerShown: true,
+          title: 'Edit Transaksi',
+        }}
+      />
+      
+      {/* --- TAMBAHKAN INI --- */}
+      <Stack.Screen
+        name="transaction-detail" // Merujuk ke app/transaction-detail.tsx
+        options={{
+          presentation: 'modal', // Muncul dari bawah
+          headerShown: true,
+          title: 'Detail Transaksi',
+        }}
+      />
+      {/* ------------------- */}
+
+    </Stack>
   );
 }
