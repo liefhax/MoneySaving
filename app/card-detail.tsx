@@ -1,8 +1,8 @@
 // app/(tabs)/card-detail.tsx
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, Stack } from 'expo-router';
-import { getTransactions } from '../services/database'; 
+import { getTransactions, deleteTransaction } from '../services/database'; 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Tipe data Transaksi (sesuai database.ts)
@@ -18,7 +18,7 @@ interface Transaction {
 
 // --- Komponen Sederhana untuk Item Transaksi (Simulasi TransactionItem) ---
 // Biasanya ini diletakkan di components/TransactionItem.tsx
-const SimpleTransactionItem: React.FC<{ item: Transaction }> = ({ item }) => {
+const SimpleTransactionItem: React.FC<{ item: Transaction; onLongPress:() => void }> = ({ item, onLongPress }) => {
     const isIncome = item.type === 'income';
     const amountSign = isIncome ? '+' : '-';
     const amountColor = isIncome ? '#3CB371' : '#FF4500'; // Hijau/Merah
@@ -36,7 +36,7 @@ const SimpleTransactionItem: React.FC<{ item: Transaction }> = ({ item }) => {
         : require('../assets/images/loss.png'); 
 
     return (
-        <TouchableOpacity style={transactionStyles.itemContainer}>
+        <TouchableOpacity style={transactionStyles.itemContainer}onLongPress={onLongPress}>
             <View style={transactionStyles.imageWrapper}>
                 <Image source={transactionImage} style={transactionStyles.transactionImage} />
             </View>
@@ -145,6 +145,37 @@ const CardDetailScreen = () => {
     );
   }
 
+  const handleDelete = (id: number) => {
+    Alert.alert(
+      "Hapus Transaksi", // Judul
+      "Apakah Anda yakin ingin menghapus transaksi ini secara permanen?", // Pesan
+      [
+        {
+          text: "Batal",
+          onPress: () => console.log("Penghapusan dibatalkan"),
+          style: "cancel"
+        },
+        {
+          text: "Hapus",
+          onPress: async () => {
+            try {
+              await deleteTransaction(id); // Panggil fungsi database
+              fetchTransactions(); // Muat ulang daftar transaksi
+            } catch (error) {
+              console.error("Gagal menghapus transaksi:", error);
+            }
+          },
+          style: "destructive" // Membuat teks "Hapus" menjadi merah
+        }
+      ]
+    );
+  };
+  // ------------------------------------
+
+  if (isLoading) {
+    // ... (return loading) ...
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Konfigurasi Header untuk Expo Router Stack */}
@@ -167,7 +198,7 @@ const CardDetailScreen = () => {
           data={transactions}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => <SimpleTransactionItem item={item} />}
+          renderItem={({ item }) => <SimpleTransactionItem item={item} onLongPress={() => handleDelete(item.id)} />}
         />
       ) : (
         <View style={styles.emptyContainer}>
