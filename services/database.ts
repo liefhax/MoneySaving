@@ -4,13 +4,11 @@ import * as SQLite from 'expo-sqlite';
 let db: SQLite.SQLiteDatabase | null = null;
 let dbInitializationPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+// --- OPEN DB & INIT ---
 const getDB = async (): Promise<SQLite.SQLiteDatabase> => {
-  if (db) {
-    return db;
-  }
-  if (dbInitializationPromise) {
-    return await dbInitializationPromise;
-  }
+  if (db) return db;
+  if (dbInitializationPromise) return await dbInitializationPromise;
+
   dbInitializationPromise = (async () => {
     try {
       const newDb = await SQLite.openDatabaseAsync('moneysaving.db');
@@ -34,10 +32,11 @@ const getDB = async (): Promise<SQLite.SQLiteDatabase> => {
       throw error;
     }
   })();
+
   return await dbInitializationPromise;
 };
 
-// --- FUNGSI 'addTransaction' (Tetap Sama) ---
+// --- ADD ---
 export const addTransaction = async (
   title: string, amount: number, type: 'income' | 'expense', date: string, source: string, purpose: string
 ) => {
@@ -55,7 +54,7 @@ export const addTransaction = async (
   }
 };
 
-// --- FUNGSI 'updateTransaction' (Tetap Sama) ---
+// --- UPDATE ---
 export const updateTransaction = async (
   id: number, title: string, amount: number, type: 'income' | 'expense', date: string, source: string, purpose: string
 ) => {
@@ -74,41 +73,44 @@ export const updateTransaction = async (
   }
 };
 
-
-// --- UBAH FUNGSI INI (Biar bisa difilter) ---
-export const getTransactions = async (filterSource?: string) => {
+// --- GET TRANSACTIONS (diperbaiki) ---
+export const getTransactions = async (filterSource?: string, limit?: number) => {
   const db = await getDB();
   try {
     let query = `SELECT * FROM transactions`;
     const params: any[] = [];
-    
-    // Jika ada filter, tambahkan 'WHERE'
+
     if (filterSource) {
       query += ` WHERE source = ?`;
       params.push(filterSource);
     }
-    
-    query += ` ORDER BY date DESC;`;
-    
-    const results: any[] = await db.getAllAsync(query, params);
+
+    query += ` ORDER BY date DESC, id DESC`;
+
+    if (limit) {
+      query += ` LIMIT ?`;
+      params.push(limit);
+    }
+
+    const results = await db.getAllAsync(query, params);
     return results;
   } catch (error) {
     console.error('❌ Error fetching transactions:', error);
-    throw error; 
+    throw error;
   }
 };
-// ------------------------------------------
 
-// --- FUNGSI 'getTotals' (Tetap Sama) ---
+// --- GET TOTALS ---
 export const getTotals = async () => {
   const db = await getDB();
   try {
-    const [data]: any[] = await db.getAllAsync(`
+    const data = await db.getFirstAsync(`
       SELECT 
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as totalIncome,
         SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as totalExpense
       FROM transactions;
     `);
+
     const income = data?.totalIncome || 0;
     const expense = data?.totalExpense || 0;
     const balance = income - expense;
@@ -119,7 +121,7 @@ export const getTotals = async () => {
   }
 };
 
-// --- FUNGSI 'deleteTransaction' (Tetap Sama) ---
+// --- DELETE ---
 export const deleteTransaction = async (id: number) => {
   const db = await getDB();
   try {
@@ -131,11 +133,11 @@ export const deleteTransaction = async (id: number) => {
   }
 };
 
-// --- FUNGSI 'getTransactionById' (Tetap Sama) ---
+// --- GET BY ID ---
 export const getTransactionById = async (id: number) => {
   const db = await getDB();
   try {
-    const result: any = await db.getFirstAsync(
+    const result = await db.getFirstAsync(
       `SELECT * FROM transactions WHERE id = ?;`,
       [id]
     );
@@ -146,11 +148,11 @@ export const getTransactionById = async (id: number) => {
   }
 };
 
+// --- GET BALANCES BY SOURCE ---
 export const getBalancesBySource = async () => {
   const db = await getDB();
   try {
-    // Query untuk menjumlahkan income dan expense, dikelompokkan berdasarkan 'source'
-    const results: any[] = await db.getAllAsync(`
+    const results = await db.getAllAsync(`
       SELECT 
         source,
         SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as totalIncome,
@@ -158,13 +160,11 @@ export const getBalancesBySource = async () => {
       FROM transactions
       GROUP BY source;
     `);
-    
-    // Hitung saldo dan format output
-    return results.map(item => ({
+
+    return results.map((item: any) => ({
       source: item.source,
       income: item.totalIncome || 0,
       expense: item.totalExpense || 0,
-      // Hitung balance: Income - Expense
       balance: (item.totalIncome || 0) - (item.totalExpense || 0),
     }));
   } catch (error) {
@@ -173,16 +173,12 @@ export const getBalancesBySource = async () => {
   }
 };
 
-
-// --- FUNGSI BARU (Untuk filter) ---
+// --- GET UNIQUE SOURCES ---
 export const getUniqueSources = async () => {
   const db = await getDB();
   try {
-    const results: any[] = await db.getAllAsync(
-      `SELECT DISTINCT source FROM transactions;`
-    );
-    // Ubah dari [{source: 'Bank'}, {source: 'Cash'}] jadi ['Bank', 'Cash']
-    return results.map(item => item.source);
+    const results = await db.getAllAsync(`SELECT DISTINCT source FROM transactions;`);
+    return results.map((item: any) => item.source);
   } catch (error) {
     console.error('❌ Error fetching unique sources:', error);
     return [];
