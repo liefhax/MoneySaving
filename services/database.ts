@@ -146,6 +146,34 @@ export const getTransactionById = async (id: number) => {
   }
 };
 
+export const getBalancesBySource = async () => {
+  const db = await getDB();
+  try {
+    // Query untuk menjumlahkan income dan expense, dikelompokkan berdasarkan 'source'
+    const results: any[] = await db.getAllAsync(`
+      SELECT 
+        source,
+        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as totalIncome,
+        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as totalExpense
+      FROM transactions
+      GROUP BY source;
+    `);
+    
+    // Hitung saldo dan format output
+    return results.map(item => ({
+      source: item.source,
+      income: item.totalIncome || 0,
+      expense: item.totalExpense || 0,
+      // Hitung balance: Income - Expense
+      balance: (item.totalIncome || 0) - (item.totalExpense || 0),
+    }));
+  } catch (error) {
+    console.error('❌ Error fetching balances by source:', error);
+    return [];
+  }
+};
+
+
 // --- FUNGSI BARU (Untuk filter) ---
 export const getUniqueSources = async () => {
   const db = await getDB();

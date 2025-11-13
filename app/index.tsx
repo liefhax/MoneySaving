@@ -1,38 +1,39 @@
 // app/index.tsx
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router'; // Import useRouter
+import { useRouter } from 'expo-router'; 
 
-// Gambar ilustrasi (pastikan path-nya benar)
-// Kamu bisa pakai gambar default dulu kalau belum ada
-// const illustration = require('../assets/images/wallet_illustration.png');
+// Pastikan gambar ini ada di: assets/images/welcome-dino.png
+const illustration = require('../assets/images/welcome-dino.png');
 
 const WelcomeScreen = () => {
-  const router = useRouter(); // Ini adalah React Hook untuk navigasi
+  const router = useRouter(); 
 
   const goToTabs = () => {
-    // Gunakan 'replace' agar user tidak bisa kembali (swipe back) ke Welcome Screen
     router.replace('/(tabs)'); 
   };
 
   return (
     <View style={styles.container}>
-      {/* Gambar Ilustrasi */}
-      {/* <Image source={illustration} style={styles.illustration} /> */}
-      <View style={styles.placeholderImage} /> 
+      
+      {/* 1. Tampilkan gambar dinosaurus */}
+      <Image source={illustration} style={styles.illustration} />
+      
+      {/* 2. Sembunyikan placeholder abu-abu */}
+      {/* <View style={styles.placeholderImage} /> */}
 
-      {/* Title */}
+      {/* 3. Title */}
       <Text style={styles.title}>Save your money with{"\n"}Expense Tracker</Text>
 
-      {/* Subtitle */}
+      {/* 4. Subtitle */}
       <Text style={styles.subtitle}>
         Save money! The more your money works for you, the less you have to work for money.
       </Text>
 
-      {/* Tombol Let's Start */}
+      {/* 5. Tombol Let's Start */}
       <TouchableOpacity
         style={styles.button}
-        onPress={goToTabs} // Panggil fungsi navigasi
+        onPress={goToTabs} 
       >
         <Text style={styles.buttonText}>Lets Start</Text>
       </TouchableOpacity>
@@ -40,6 +41,7 @@ const WelcomeScreen = () => {
   );
 };
 
+// --- STYLES UNTUK WELCOME SCREEN ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -48,14 +50,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 20,
   },
-  // Hapus ini jika kamu sudah punya gambar asli
+  // Style untuk placeholder (disembunyikan)
   placeholderImage: {
     width: 250,
     height: 250,
-    backgroundColor: '#E0E0E0', // Warna placeholder
+    backgroundColor: '#E0E0E0', 
     borderRadius: 20,
     marginBottom: 40,
   },
+  // Style untuk gambar dinosaurus
   illustration: {
     width: 250,
     height: 250,
@@ -77,7 +80,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   button: {
-    backgroundColor: '#6A5ACD', // Warna ungu dari mockup
+    backgroundColor: '#6A5ACD', 
     paddingVertical: 15,
     paddingHorizontal: 60,
     borderRadius: 30,
