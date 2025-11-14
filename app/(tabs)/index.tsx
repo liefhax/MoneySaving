@@ -7,10 +7,10 @@ import {
   SafeAreaView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator, // <-- MODIFIKASI: Import ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-// Import useLocalSearchParams
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import Constants from 'expo-constants';
 
@@ -23,11 +23,14 @@ const HomeScreen = () => {
   const [totals, setTotals] = useState({ income: 0, expense: 0, balance: 0 });
   const [transactions, setTransactions] = useState<any[]>([]);
 
-  // State dan params untuk confetti
   const params = useLocalSearchParams();
   const [displayConfetti, setDisplayConfetti] = useState(false);
 
-  // --- Ambil data total & transaksi ---
+  // --- MODIFIKASI: Tambahkan isLoading state ---
+  // Mulai dengan 'true' agar render pertama adalah loading
+  const [isLoading, setIsLoading] = useState(true);
+  // ---------------------------------------------
+
   const loadData = useCallback(async () => {
     try {
       const [totalsData, transactionsData] = await Promise.all([
@@ -41,43 +44,37 @@ const HomeScreen = () => {
     }
   }, []);
 
-  // --- MODIFIKASI DIMULAI DI SINI ---
-  // Kita gabungkan semua logika "saat fokus" ke sini
+  // --- MODIFIKASI: Logika useFocusEffect diubah ---
   useFocusEffect(
     useCallback(() => {
-      // Buat fungsi async di dalam agar bisa 'await'
       const runOnFocus = async () => {
-        // 1. TUNGGU data selesai di-load
+        // 1. Tampilkan loading spinner
+        setIsLoading(true);
+
+        // 2. TUNGGU data selesai di-load
         await loadData();
 
-        // 2. SETELAH data di-load, baru cek sinyal confetti
-        if (params.showConfetti === 'true') {
-          // 3. Tampilkan confetti (di atas data yang sudah baru)
-          setDisplayConfetti(true);
+        // 3. Hentikan loading, tampilkan data
+        setIsLoading(false);
 
-          // 4. Langsung hapus sinyalnya agar tidak terulang
-          //    jika user ganti tab lalu kembali lagi.
+        // 4. SETELAH data tampil, baru cek sinyal confetti
+        if (params.showConfetti === 'true') {
+          setDisplayConfetti(true);
           router.setParams({ showConfetti: undefined });
         }
       };
 
-      // Jalankan fungsi async tersebut
       runOnFocus();
 
-      return () => {}; // cleanup opsional
-    }, [loadData, params.showConfetti, router]) // Tambahkan dependensi
+      return () => {};
+    }, [loadData, params.showConfetti, router])
   );
+  // -----------------------------------------------
 
-  // HAPUS useEffect yang lama, karena logikanya sudah pindah ke atas
-  // useEffect(() => { ... }, [params.showConfetti]);
-
-  // Handler untuk saat animasi confetti selesai
   const handleConfettiComplete = () => {
-    setDisplayConfetti(false); // Cukup sembunyikan saja
+    setDisplayConfetti(false);
   };
-  // --- MODIFIKASI BERAKHIR DI SINI ---
 
-  // --- Format angka ke IDR ---
   const formatIDR = (value: number) => {
     return value.toLocaleString('id-ID', { maximumFractionDigits: 0 });
   };
@@ -96,27 +93,35 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* === KARTU BALANCE === */}
-        <LinearGradient colors={['#8E2DE2', '#4A00E0']} style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceAmount}>IDR {formatIDR(totals.balance)}</Text>
-          <View style={styles.incomeExpenseContainer}>
-            <View style={styles.incomeExpenseBox}>
-              <Ionicons name="arrow-down" size={20} color="#28B463" />
-              <View style={{ marginLeft: 8 }}>
-                <Text style={styles.ieLabel}>Income</Text>
-                <Text style={styles.ieAmount}>IDR {formatIDR(totals.income)}</Text>
-              </View>
-            </View>
-            <View style={styles.incomeExpenseBox}>
-              <Ionicons name="arrow-up" size={20} color="#E74C3C" />
-              <View style={{ marginLeft: 8 }}>
-                <Text style={styles.ieLabel}>Expenses</Text>
-                <Text style={styles.ieAmount}>IDR {formatIDR(totals.expense)}</Text>
-              </View>
-            </View>
+        {/* === KARTU BALANCE (MODIFIKASI) === */}
+        {isLoading ? (
+          // Selama loading, tampilkan placeholder ini
+          <View style={[styles.balanceCard, styles.loadingPlaceholder]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
-        </LinearGradient>
+        ) : (
+          // Setelah loading selesai, tampilkan kartu balance
+          <LinearGradient colors={['#8E2DE2', '#4A00E0']} style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>Total Balance</Text>
+            <Text style={styles.balanceAmount}>IDR {formatIDR(totals.balance)}</Text>
+            <View style={styles.incomeExpenseContainer}>
+              <View style={styles.incomeExpenseBox}>
+                <Ionicons name="arrow-down" size={20} color="#28B463" />
+                <View style={{ marginLeft: 8 }}>
+                  <Text style={styles.ieLabel}>Income</Text>
+                  <Text style={styles.ieAmount}>IDR {formatIDR(totals.income)}</Text>
+                </View>
+              </View>
+              <View style={styles.incomeExpenseBox}>
+                <Ionicons name="arrow-up" size={20} color="#E74C3C" />
+                <View style={{ marginLeft: 8 }}>
+                  <Text style={styles.ieLabel}>Expenses</Text>
+                  <Text style={styles.ieAmount}>IDR {formatIDR(totals.expense)}</Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        )}
 
         {/* === TRANSACTIONS === */}
         <View style={styles.transactionsHeader}>
@@ -126,22 +131,30 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* === DAFTAR TRANSAKSI === */}
-        <FlatList
-          data={transactions.slice(0, 5)}
-          keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
-          renderItem={({ item }) => (
-            <TransactionItem
-              title={item.title}
-              purpose={item.purpose}
-              date={new Date(item.date).toLocaleDateString('id-ID')}
-              amount={item.amount}
-              type={item.type}
-            />
-          )}
-          style={styles.list}
-          ListEmptyComponent={<Text style={styles.emptyText}>Belum ada transaksi</Text>}
-        />
+        {/* === DAFTAR TRANSAKSI (MODIFIKASI) === */}
+        {isLoading ? (
+          // Selama loading, tampilkan spinner di area list
+          <View style={styles.listLoading}>
+            <ActivityIndicator size="large" color="#6A5ACD" />
+          </View>
+        ) : (
+          // Setelah loading, tampilkan list
+          <FlatList
+            data={transactions.slice(0, 5)}
+            keyExtractor={(item) => item.id?.toString() ?? Math.random().toString()}
+            renderItem={({ item }) => (
+              <TransactionItem
+                title={item.title}
+                purpose={item.purpose}
+                date={new Date(item.date).toLocaleDateString('id-ID')}
+                amount={item.amount}
+                type={item.type}
+              />
+            )}
+            style={styles.list}
+            ListEmptyComponent={<Text style={styles.emptyText}>Belum ada transaksi</Text>}
+          />
+        )}
       </View>
 
       {/* Render komponen confetti */}
@@ -183,6 +196,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 20,
   },
+  // --- MODIFIKASI: Tambahkan style ini ---
+  loadingPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#A06CD5', // Warna 'abu-abu' dari gradien
+    height: 175, // Samakan tinggi estimasi kartu
+  },
+  // ------------------------------------
   balanceLabel: {
     fontSize: 16,
     color: 'rgba(255,255,255,0.7)',
@@ -202,7 +223,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-ieLabel: {
+  ieLabel: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
   },
@@ -231,6 +252,14 @@ ieLabel: {
     flex: 1,
     paddingBottom: 80,
   },
+  // --- MODIFIKASI: Tambahkan style ini ---
+  listLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80,
+  },
+  // ------------------------------------
   emptyText: {
     textAlign: 'center',
     marginTop: 20,
