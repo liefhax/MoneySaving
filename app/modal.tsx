@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView
+  ScrollView,
 } from 'react-native';
 import { addTransaction } from '../services/database';
 import { useRouter } from 'expo-router';
@@ -93,7 +93,24 @@ export default function ModalAddPage() {
 
     try {
       await addTransaction(title, amountValue, type, date, finalSource, finalPurpose);
-      router.replace('/(tabs)');
+
+      // --- MODIFIKASI DIMULAI DI SINI ---
+      // Tentukan batas "signifikan", misal 100.000
+      const SIGNIFICANT_AMOUNT_THRESHOLD = 100000;
+
+      const isSignificantIncome = type === 'income' && amountValue > SIGNIFICANT_AMOUNT_THRESHOLD;
+
+      if (isSignificantIncome) {
+        // Kirim "sinyal" ke dashboard untuk memutar confetti
+        router.replace({
+          pathname: '/(tabs)',
+          params: { showConfetti: 'true' }, // Ini sinyalnya!
+        });
+      } else {
+        // Kembali ke dashboard seperti biasa (ini baris aslinya)
+        router.replace('/(tabs)');
+      }
+      // --- MODIFIKASI BERAKHIR DI SINI ---
     } catch (error) {
       console.error('Gagal simpan dari modal:', error);
       Alert.alert('Database Error', 'Gagal menyimpan transaksi: ' + (error as Error).message);
@@ -163,7 +180,7 @@ export default function ModalAddPage() {
         {/* Judul */}
         <TextInput
           style={styles.input}
-          placeholder="Judul Transaksi"
+          placeholder="Judul(Cth: Gaji bulanan, Makan)"
           value={title}
           onChangeText={setTitle}
         />
@@ -171,7 +188,7 @@ export default function ModalAddPage() {
         {/* Jumlah */}
         <TextInput
           style={styles.input}
-          placeholder="Jumlah"
+          placeholder="Jumlah (IDR)"
           keyboardType="numeric"
           value={formattedAmount}
           onChangeText={handleAmountChange}
@@ -228,28 +245,29 @@ export default function ModalAddPage() {
 }
 
 // --- STYLES ---
+// (StyleSheet Anda tetap sama, tidak perlu disalin ulang di sini)
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: '#00000090',
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
   modalBox: {
     backgroundColor: 'white',
     borderRadius: 20,
     margin: 20,
-    padding: 10
+    padding: 10,
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 15
+    marginBottom: 15,
   },
   typeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 15
+    marginBottom: 15,
   },
   typeButton: {
     flex: 1,
@@ -258,41 +276,41 @@ const styles = StyleSheet.create({
     borderColor: '#aaa',
     borderRadius: 10,
     marginHorizontal: 5,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   typeButtonText: {
     fontSize: 16,
-    color: '#555'
+    color: '#555',
   },
   activeIncome: {
     backgroundColor: '#4caf50',
-    borderColor: '#4caf50'
+    borderColor: '#4caf50',
   },
   activeExpense: {
     backgroundColor: '#f44336',
-    borderColor: '#f44336'
+    borderColor: '#f44336',
   },
   typeButtonTextActive: {
     color: '#fff',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 10
+    marginBottom: 10,
   },
   sectionLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginTop: 10,
-    marginBottom: 5
+    marginBottom: 5,
   },
   buttonGroup: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 10
+    marginBottom: 10,
   },
   catButton: {
     paddingVertical: 8,
@@ -301,39 +319,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#aaa',
     marginRight: 6,
-    marginBottom: 6
+    marginBottom: 6,
   },
   catButtonActive: {
     backgroundColor: '#2196f3',
-    borderColor: '#2196f3'
+    borderColor: '#2196f3',
   },
   catButtonText: {
-    color: '#555'
+    color: '#555',
   },
   catButtonTextActive: {
     color: '#fff',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 15
+    marginTop: 15,
   },
   footerBtn: {
     flex: 1,
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
-    marginHorizontal: 5
+    marginHorizontal: 5,
   },
   saveBtn: {
-    backgroundColor: '#4caf50'
+    backgroundColor: '#4caf50',
   },
   cancelBtn: {
-    backgroundColor: '#f44336'
+    backgroundColor: '#f44336',
   },
   footerText: {
     color: '#fff',
-    fontWeight: '600'
-  }
+    fontWeight: '600',
+  },
 });
