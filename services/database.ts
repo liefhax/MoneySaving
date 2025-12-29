@@ -184,3 +184,51 @@ export const getUniqueSources = async () => {
     return [];
   }
 };
+
+// --- RESET DATABASE (DANGER ZONE) ---
+export const deleteAllTransactions = async () => {
+  const db = await getDB();
+  try {
+    await db.runAsync('DELETE FROM transactions'); // Hapus semua isinya
+    // Opsional: Reset sequence ID biar balik ke 1 lagi
+    await db.runAsync('DELETE FROM sqlite_sequence WHERE name="transactions"');
+    console.log('✅ All data wiped successfully');
+  } catch (error) {
+    console.error('❌ Error resetting database:', error);
+    throw error;
+  }
+};
+
+// --- CONVERT CURRENCY (KONVERSI NILAI DI DB) ---
+// rate: nilai tukar (misal 1 USD = 15000 IDR, atau sebaliknya)
+export const convertAllAmounts = async (rate: number) => {
+  const db = await getDB();
+  try {
+    // Kita kalikan semua amount dengan rate yang dikasih
+    await db.runAsync(`UPDATE transactions SET amount = amount * ?`, [rate]);
+    console.log('✅ Currency converted');
+  } catch (error) {
+    console.error('❌ Error converting currency:', error);
+    throw error;
+  }
+};
+
+// --- IMPORT DATA (BULK INSERT) ---
+// Kita asumsikan data masuk berupa array of object dari CSV
+export const importTransactions = async (data: any[]) => {
+  const db = await getDB();
+  try {
+    // Loop insert (cara simple buat sqlite expo)
+    for (const item of data) {
+      await db.runAsync(
+        `INSERT INTO transactions (title, amount, type, date, source, purpose)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [item.title, item.amount, item.type, item.date, item.source, item.purpose]
+      );
+    }
+    console.log(`✅ Imported ${data.length} transactions`);
+  } catch (error) {
+    console.error('❌ Error importing data:', error);
+    throw error;
+  }
+};
